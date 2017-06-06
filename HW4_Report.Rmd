@@ -29,7 +29,7 @@ inTrain <- sample(1:n, size = ceiling(n*0.9))
 data.train <- q1_data[inTrain,]
 data.test <- q1_data[-inTrain,]
 
-pca_comps <- prcomp(formula = ~. - Crime - So,  data = data.train)
+pca_comps <- prcomp(formula = ~. - Crime - So,  data = data.train, center = TRUE, scale = TRUE)
 
 data_pcomps <- function(pcomps, data) {
     return(as.data.frame(cbind(predict(pcomps, data), So = as.factor(data$So), Crime = data$Crime)))
@@ -54,8 +54,32 @@ newpred <- predict(model, data.new.pcomps)
 
 The data set is split into a test (~10%) and training (~90%) with the same random seed used in my HW3 report. Principle components are computed for all of the predictors **except** `So` because it is categorical.
 
-Figure \@ref(fig:varexp) shows the cumulative amount of variance explained by the first four principle components. Without `So` they already explain over 99% of the variance. The final model is therefore constructed from the first four principle components plus `So` as the predictors.
+Figure \@ref(fig:varexp) shows the cumulative amount of variance explained by the first four principle components. Without `So` they already explain over 99% of the variance.
 
 ```{r varexp, fig.cap = 'Cumulative porportion of variance explained by the principle components.'}
 plot(summary(pca_comps)$importance[3,], xlab = 'Principle Component Index', ylab = 'Cumulative Porportion of Variance Explained')
+```
+
+The final model is trained using the first four principle components plus `So` as the predictors. The final model using principle components contains the following coefficients:
+
+```{r}
+model$coefficients
+```
+
+Writing out the model using the original predictors, we have:
+
+```{r}
+coefs <- rowSums(model$coefficients[2:5] * pca_comps$rotation[,1:4]) * pca_comps$scale
+
+varnames <- names(coefs)
+
+equation <- function(varname, coef, center) {
+    
+    str = paste(coef, '*(', varname, ' - ', center, ')', sep = '') 
+}
+
+So_str <- paste(model$coefficients[6], '*So', sep = '')
+equation_str <- paste('Crime = ', paste(c(mapply(FUN = equation, varnames, coefs, pca_comps$center), So_str), collapse = ' + '), sep = '')
+equation_str
+
 ```
