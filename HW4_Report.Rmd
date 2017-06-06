@@ -1,0 +1,61 @@
+---
+title: "ISYE6501 HW4"
+author: "Keh-Harng Feng"
+date: "June 6, 2017"
+output: 
+  bookdown::html_document2:
+    fig_caption: TRUE
+    toc: FALSE
+urlcolor: blue
+---
+```{r setup, include=FALSE}
+library('knitr')
+opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE, cache = TRUE)
+options(digits = 4)
+```
+
+# Question 1
+**Using the same crime data set as in Homework 3 Question 4, apply Principal Component Analysis and then create a regression model using the first 4 principal components. Specify your new model in terms of the original variables (not the principal components), and compare its quality to that of your solution to Homework 3 Question 4. You can use the R function prcomp for PCA. (Note that to first scale the data, you can include scale. = TRUE to scale as part of the PCA function.)**
+
+```{r}
+set.seed(1)
+
+q1_data <- read.table('uscrime.txt', header = TRUE)
+
+n <- nrow(q1_data)
+
+inTrain <- sample(1:n, size = ceiling(n*0.9))
+
+data.train <- q1_data[inTrain,]
+data.test <- q1_data[-inTrain,]
+
+pca_comps <- prcomp(formula = ~. - Crime - So,  data = data.train)
+
+data_pcomps <- function(pcomps, data) {
+    return(as.data.frame(cbind(predict(pcomps, data), So = as.factor(data$So), Crime = data$Crime)))
+}
+
+data.train.pcomps <- data_pcomps(pca_comps, data.train)
+
+model <- lm(Crime ~ PC1 + PC2 + PC3 + PC4 + So, data = data.train.pcomps)
+
+data.test.pcomps <- data_pcomps(pca_comps, data.test)
+
+pred <- predict(model, data.test.pcomps)
+
+mse <- ModelMetrics::mse(data.test$Crime, pred)
+
+data.new <- data.frame(M = 14, So = 0, Ed = 10, Po1 = 12, Po2 = 15.5, LF = 0.64, M.F = 94, Pop = 150, NW = 1.1, U1 = 0.12, U2 = 3.6, Wealth = 3200, Ineq = 20.1, Prob = 0.04, Time = 39.0)
+
+data.new.pcomps <- data_pcomps(pca_comps, data.new)
+
+newpred <- predict(model, data.new.pcomps)
+```
+
+The data set is split into a test (~10%) and training (~90%) with the same random seed used in my HW3 report. Principle components are computed for all of the predictors **except** `So` because it is categorical.
+
+Figure \@ref(fig:varexp) shows the cumulative amount of variance explained by the first four principle components. Without `So` they already explain over 99% of the variance. The final model is therefore constructed from the first four principle components plus `So` as the predictors.
+
+```{r varexp, fig.cap = 'Cumulative porportion of variance explained by the principle components.'}
+plot(summary(pca_comps)$importance[3,], xlab = 'Principle Component Index', ylab = 'Cumulative Porportion of Variance Explained')
+```
