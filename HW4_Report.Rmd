@@ -3,15 +3,22 @@ title: "ISYE6501 HW4"
 author: "Keh-Harng Feng"
 date: "June 6, 2017"
 output: 
-  bookdown::pdf_book:
+  bookdown::html_document2:
     fig_caption: TRUE
     toc: FALSE
 urlcolor: blue
 ---
 ```{r setup, include=FALSE}
 library('knitr')
+library('rpart')
+library('randomForest')
+library('caret')
+library('parallel')
+
 opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE, cache = TRUE)
 options(digits = 4)
+
+
 ```
 
 ## Preface
@@ -26,12 +33,18 @@ set.seed(1)
 
 q1_data <- read.table('uscrime.txt', header = TRUE)
 
+q1_data$So <- factor(q1_data$So)
+
 n <- nrow(q1_data)
 
 inTrain <- sample(1:n, size = ceiling(n*0.9))
 
 data.train <- q1_data[inTrain,]
 data.test <- q1_data[-inTrain,]
+
+# Stupid hack to make sure test set factors have the same level as training set.
+data.test <- rbind(data.train[1, ], data.test)
+data.test <- data.test[-1,]
 
 pca_comps <- prcomp(formula = ~. - Crime - So,  data = data.train, center = TRUE, scale = TRUE)
 
@@ -46,7 +59,7 @@ predict_pcomps <- function(pcomps, data) {
 
 data.train.pcomps <- predict_pcomps(pca_comps, data.train)
 
-model <- lm(Crime ~ PC1 + PC2 + PC3 + PC4 + factor(So), data = data.train.pcomps)
+model <- lm(Crime ~ PC1 + PC2 + PC3 + PC4 + So, data = data.train.pcomps)
 
 data.test.pcomps <- predict_pcomps(pca_comps, data.test)
 
@@ -129,7 +142,7 @@ my_predict_func <- function(coefs, center, newdata) {
             resp[i] <- resp[i] + coefs[var]*(datapoint[[var]] - center[var])
         }
     
-        resp[i] <- resp[i] + model$coefficients[6]*datapoint$So + model$coefficients[1]
+        resp[i] <- resp[i] + model$coefficients[6]*as.numeric(paste(datapoint$So)) + model$coefficients[1]
     
     }
     
@@ -148,3 +161,68 @@ kable(df)
 The equation is indeed correct.
 
 ## Model Performance
+
+The model using the first four principle components achieved a MSE of $`r mse`$ on the test set. The model I built in HW3 using the same training set was able to achieve a MSE of 1.3309e4 on the same test set. **The PC model has worse performance.** It should be noted however that my HW3 model was built with extensive feature selection along with data transformation assisted by exploratory data analysis. It is also possible that my HW3 model was overfitted (especially since the sample was so small and there was a bit of test set contamination due to transformation being carried out prior to training/test split.)
+
+# Question 2
+**Using the same crime data set as in Homework 3 Question 4, find the best model you can using (a) a regression tree model, and (b) a random forest model. In R, you can use the tree package or the rpart package, and the randomForest package. For each model, describe one or two qualitative takeaways you get from analyzing the results (i.e., don’t just stop when you have a good model, but interpret it too).**
+
+## Part A: Regression Tree
+
+
+## Part B: Random Forest
+A bit of parameter tuning is done to create a model random forest. The out-of-sample MSE is estimated using 10-fold CV for forests ranging from 50 trees to 5000 in increment of 50. The resulting average MSE is plotted in Figure \@ref(fig:msetrees).
+
+```{r}
+set.seed(123)
+
+tree <- rpart(Crime ~ ., data = data.train, method = 'anova')
+
+inVal <- sample(1:nrow(data.train), size = ceiling(n*0.1))
+
+forest <- randomForest(Crime ~ ., data = data.train, ntree = 1000)
+
+tree_pred <- predict(tree, data.test)
+forest_pred <- predict(forest, data.test)
+
+#ModelMetrics::mse(data.test$Crime, tree_pred)
+
+#ModelMetrics::mse(data.test$Crime, forest_pred)
+
+ntrees <- seq(from = 50, to = 5000, by = 50)
+mse_vec <- rep(0, length(ntrees))
+
+folds <- createFolds(data.train$Crime, k = 5)
+
+# ntree mse plot
+
+test_mse <- function(fold, num_trees, data){
+    data.fold <- data[fold,]
+    data.outside <- data[-fold,]
+    forest_test <- randomForest::randomForest(Crime ~ ., data = data.outside, ntree = num_trees)  
+    mse_val <- ModelMetrics::mse(data.fold$Crime, predict(forest_test, data.fold))
+} 
+
+# Set up parallel processing clusters
+cl <- makePSOCKcluster(4)
+
+for (i in seq_along(ntrees)) {
+    
+    
+    
+    mse_test <- parSapply(cl = cl, X = folds, FUN = test_mse, 
+                          num_trees = ntrees[i], data = data.train)
+    
+    mse_vec[i] <- mean(mse_test)
+}
+
+stopCluster(cl)
+```
+
+```{r msetrees, fig.cap = 'Estimated OOS MSE vs Number of Trees in Forest'}
+plot(ntrees, mse_vec, xlab = 'Number of Trees', ylab = 'MSE Estimation (10-fold CV)')
+```
+
+While overall there is no discernable decrease to the estimated MSE as the number of trees increases, the variance in MSE does become smaller. This seems to indicate that the more trees a random forest has, the more stable it is in making prediction. The highest number of trees tested, ntrees = 5000, is chosen to build the final random forest model.
+
+## Model Comparison & Performance Evaluation
