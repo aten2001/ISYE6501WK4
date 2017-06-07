@@ -223,6 +223,6 @@ stopCluster(cl)
 plot(ntrees, mse_vec, xlab = 'Number of Trees', ylab = 'MSE Estimation (10-fold CV)')
 ```
 
-While overall there is no discernable decrease to the estimated MSE as the number of trees increases, the variance in MSE does become smaller. This seems to indicate that the more trees a random forest has, the more stable it is in making prediction. The highest number of trees tested, ntrees = 5000, is chosen to build the final random forest model.
+While overall there is no discernible decrease to the estimated MSE as the number of trees increases, the variance in MSE does become smaller. This seems to indicate that the more trees a random forest has, the more stable it is in making prediction. The highest number of trees tested, ntrees = 5000, is chosen to build the final random forest model.
 
 ## Model Comparison & Performance Evaluation
