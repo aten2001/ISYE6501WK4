@@ -168,6 +168,17 @@ The model using the first four principle components achieved a MSE of $`r mse`$ 
 **Using the same crime data set as in Homework 3 Question 4, find the best model you can using (a) a regression tree model, and (b) a random forest model. In R, you can use the tree package or the rpart package, and the randomForest package. For each model, describe one or two qualitative takeaways you get from analyzing the results (i.e., don’t just stop when you have a good model, but interpret it too).**
 
 ## Part A: Regression Tree
+```{r}
+set.seed(123)
+trCon <- trainControl(method = 'cv', number = 10)
+tree <- train(Crime ~., data = data.train, method = 'rpart', trControl = trCon)
+```
+
+A regression tree model is built using `rpart` in conjunction with `train()` from `caret`. Automatic tuning of the `cp` parameter was done using cross-validation. No transformation on the data was done prior to model training since tree algorithims are generally not sensitive to things such as predictor/response distributions. Model information is shown below:
+
+```{r}
+tree
+```
 
 
 ## Part B: Random Forest
@@ -175,8 +186,6 @@ A bit of parameter tuning is done to create a model random forest. The out-of-sa
 
 ```{r}
 set.seed(123)
-
-tree <- rpart(Crime ~ ., data = data.train, method = 'anova')
 
 inVal <- sample(1:nrow(data.train), size = ceiling(n*0.1))
 
@@ -192,7 +201,7 @@ forest_pred <- predict(forest, data.test)
 ntrees <- seq(from = 50, to = 5000, by = 50)
 mse_vec <- rep(0, length(ntrees))
 
-folds <- createFolds(data.train$Crime, k = 5)
+folds <- createFolds(data.train$Crime, k = 10)
 
 # ntree mse plot
 
