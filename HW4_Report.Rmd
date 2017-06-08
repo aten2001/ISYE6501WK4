@@ -2,8 +2,10 @@
 title: "ISYE6501 HW4"
 author: "Keh-Harng Feng"
 date: "June 6, 2017"
+header-includes:
+    - \usepackage{placeins}
 output: 
-  bookdown::html_document2:
+  bookdown::pdf_book:
     fig_caption: TRUE
     toc: FALSE
 urlcolor: blue
@@ -14,6 +16,7 @@ library('rpart')
 library('randomForest')
 library('caret')
 library('parallel')
+library('rpart.plot')
 
 opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE, cache = TRUE)
 options(digits = 4)
@@ -65,7 +68,7 @@ data.test.pcomps <- predict_pcomps(pca_comps, data.test)
 
 pred <- predict(model, data.test.pcomps)
 
-mse <- ModelMetrics::mse(data.test$Crime, pred)
+q1_mse <- ModelMetrics::mse(data.test$Crime, pred)
 
 data.new <- data.frame(M = 14, So = factor(0, levels = c(0, 1)), Ed = 10, Po1 = 12, Po2 = 15.5, LF = 0.64, M.F = 94, Pop = 150, NW = 1.1, U1 = 0.12, U2 = 3.6, Wealth = 3200, Ineq = 20.1, Prob = 0.04, Time = 39.0)
 
@@ -129,9 +132,11 @@ Writing out the model using the original predictors, we have:
 
 $`r equation_str`$
 
-The table below shows the results computed from the above equation (using regular predictors) and the predictions using predict() on the PCA transformed test set side by side:
+Table \@ref(tab:eq-pca) shows the results computed from the above equation (using regular predictors) and the predictions using predict() on the PCA transformed test set side by side. The equation is indeed correct.
 
-```{r}
+\FloatBarrier
+
+```{r eq-pca}
 my_predict_func <- function(coefs, center, newdata) {
     resp <- rep(0, nrow(newdata))
     
@@ -155,14 +160,14 @@ my_pred <- my_predict_func(coefs, pca_comps$center, data.test)
 df <- data.frame(Equation = my_pred, PCA = pred)
 rownames(df) <- c()
 
-kable(df)
+kable(df, caption = 'Prediction values using direct equation vs prediction values using PCA model.')
 ```
-
-The equation is indeed correct.
 
 ## Model Performance
 
-The model using the first four principle components achieved a MSE of $`r mse`$ on the test set. The model I built in HW3 using the same training set was able to achieve a MSE of 1.3309e4 on the same test set. **The PC model has worse performance.** It should be noted however that my HW3 model was built with extensive feature selection along with data transformation assisted by exploratory data analysis. It is also possible that my HW3 model was overfitted (especially since the sample was so small and there was a bit of test set contamination due to transformation being carried out prior to training/test split.)
+The model using the first four principle components achieved a MSE of $`r q1_mse`$ on the test set. The model I built in HW3 using the same training set was able to achieve a MSE of 1.3309e4 on the same test set. **The PC model has worse performance.** It should be noted however that my HW3 model was built with extensive feature selection along with data transformation assisted by exploratory data analysis. It is also possible that my HW3 model was overfitted (especially since the sample was so small and there was a bit of test set contamination due to transformation being carried out prior to training/test split.)
+
+\pagebreak
 
 # Question 2
 **Using the same crime data set as in Homework 3 Question 4, find the best model you can using (a) a regression tree model, and (b) a random forest model. In R, you can use the tree package or the rpart package, and the randomForest package. For each model, describe one or two qualitative takeaways you get from analyzing the results (i.e., don’t just stop when you have a good model, but interpret it too).**
@@ -171,32 +176,30 @@ The model using the first four principle components achieved a MSE of $`r mse`$ 
 ```{r}
 set.seed(123)
 trCon <- trainControl(method = 'cv', number = 10)
-tree <- train(Crime ~., data = data.train, method = 'rpart', trControl = trCon)
+tree <- train(Crime ~., data = data.train, method = 'rpart', trControl = trCon, parms = list(method = 'anova'))
+tree_pred <- predict(tree, data.test)
+tree_mse <- ModelMetrics::mse(data.test$Crime, tree_pred)
 ```
 
-A regression tree model is built using `rpart` in conjunction with `train()` from `caret`. Automatic tuning of the `cp` parameter was done using cross-validation. No transformation on the data was done prior to model training since tree algorithims are generally not sensitive to things such as predictor/response distributions. Model information is shown below:
+As usual, the data is split into the same training set and test set as before. A regression tree model is built using `rpart` in conjunction with `train()` from `caret` on the training set. Automatic tuning of the `cp` parameter was done using cross-validation. No transformation on the data was done prior to model training since tree algorithims are generally not sensitive to things such as predictor/response distributions. Model information is shown below:
 
 ```{r}
 tree
 ```
 
+A graphical representation of the tree is shown in Figure \@ref(fig:rpartplot)
+
+```{r rpartplot, fig.cap = 'The regression tree model.'}
+rpart.plot(tree$finalModel)
+```
+
+Incredibly the final tree model only makes use of ONE predictor, `Po2`. It can only make TWO different predictions: 666 or 1154 for the crime rate. Decisions are made by checking the `Po2` predictor values against 7.2. Its performance will be evaluated later on the test set.
 
 ## Part B: Random Forest
 A bit of parameter tuning is done to create a model random forest. The out-of-sample MSE is estimated using 10-fold CV for forests ranging from 50 trees to 5000 in increment of 50. The resulting average MSE is plotted in Figure \@ref(fig:msetrees).
 
 ```{r}
 set.seed(123)
-
-inVal <- sample(1:nrow(data.train), size = ceiling(n*0.1))
-
-forest <- randomForest(Crime ~ ., data = data.train, ntree = 1000)
-
-tree_pred <- predict(tree, data.test)
-forest_pred <- predict(forest, data.test)
-
-#ModelMetrics::mse(data.test$Crime, tree_pred)
-
-#ModelMetrics::mse(data.test$Crime, forest_pred)
 
 ntrees <- seq(from = 50, to = 5000, by = 50)
 mse_vec <- rep(0, length(ntrees))
@@ -210,6 +213,7 @@ test_mse <- function(fold, num_trees, data){
     data.outside <- data[-fold,]
     forest_test <- randomForest::randomForest(Crime ~ ., data = data.outside, ntree = num_trees)  
     mse_val <- ModelMetrics::mse(data.fold$Crime, predict(forest_test, data.fold))
+    return(mse_val)
 } 
 
 # Set up parallel processing clusters
@@ -232,6 +236,31 @@ stopCluster(cl)
 plot(ntrees, mse_vec, xlab = 'Number of Trees', ylab = 'MSE Estimation (10-fold CV)')
 ```
 
-While overall there is no discernible decrease to the estimated MSE as the number of trees increases, the variance in MSE does become smaller. This seems to indicate that the more trees a random forest has, the more stable it is in making prediction. The highest number of trees tested, ntrees = 5000, is chosen to build the final random forest model.
+While overall there is no discernible decrease to the average of estimated MSE as the number of trees increases, the variance in MSE does become smaller. This seems to indicate that the more trees a random forest has, the more stable it is in making prediction. The highest number of trees tested, ntrees = 5000, is chosen to build the final random forest model.
 
-## Model Comparison & Performance Evaluation
+```{r}
+set.seed(123)
+forest <- randomForest(Crime ~ ., data = data.train, ntree = 5000)
+forest_pred <- predict(forest, data.test)
+forest_mse <- ModelMetrics::mse(data.test$Crime, forest_pred)
+```
+
+Unfortunately, unlike regression trees there are no simple ways to visualize the forest effectively. Interpretation of random forest models is always a difficult if not down right impossible task due to the aggregation of many trees together. Whille it is possible to graphically show a single tree in the forest like in Figure \@ref(fig:rpartplot), it is not a statistically meaningful representation of the forest.
+
+## Performance Evaluation
+
+The RMSE of the four different models I have built so far are shown in Table \@ref(tab:rmse-table). All models are trained on the same training set and tested on the same test set. It is clear that the predictor transformation and selection algorithm I came up with for HW3 either paid off or got lucky with this test set - the simple multivariate linear regression model is the best performer out of the bunch. This is followed not so closely by random forest, then regression tree and finally the PCA MLR model. The performance of the regression tree surprised me since it is only capable of making two prediction values yet it did better than PCA MLR. Perhaps it's caused by the distribution of the response or the specific test set used.
+\FloatBarrier
+```{r rmse-table}
+rmse_hw3 <- sqrt(1.3309e4)
+rmse_q1 <- sqrt(q1_mse)
+rmse_tree <- sqrt(tree_mse)
+rmse_forest <- sqrt(forest_mse)
+
+rmse_table <- data.frame(Model = c('HW3 MLR', 'Q1 PCA MLR', 'RPART Tree', 'Random Forest'), RMSE = c(rmse_hw3, rmse_q1, rmse_tree, rmse_forest))
+
+kable(rmse_table, caption = 'RMSE of the 4 different models trained for the uscrime data.')
+```
+\pagebreak
+
+# Question 3
