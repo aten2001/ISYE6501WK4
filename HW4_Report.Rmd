@@ -184,9 +184,13 @@ tree
 
 A graphical representation of the tree is shown in Figure \@ref(fig:rpartplot)
 
+\FloatBarrier
+
 ```{r rpartplot, fig.cap = 'The regression tree model.'}
 rpart.plot(tree$finalModel)
 ```
+
+\FloatBarrier
 
 Incredibly the final tree model only makes use of ONE predictor, `Po2`. It can only make TWO different predictions: 666 or 1154 for the crime rate. Decisions are made by checking the `Po2` predictor values against 7.2. Its performance will be evaluated later on the test set.
 
