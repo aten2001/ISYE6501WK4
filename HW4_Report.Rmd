@@ -17,6 +17,7 @@ library('randomForest')
 library('caret')
 library('parallel')
 library('rpart.plot')
+library('MASS')
 
 opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, tidy = TRUE, cache = TRUE)
 options(digits = 4)
@@ -25,7 +26,7 @@ options(digits = 4)
 ```
 
 ## Preface
-This is a reproducible report with most of the codes doing the heavy lifting hidden in the background. **All codes are available to be audited.** You can download the source code of the report by [clicking here](https://github.com/fengkehh/ISYE6501WK4/blob/master/HW4_Report.Rmd). As a general rule of thumb you should NOT run any downloaded R scripts from an untrusted source on your computer without understanding the source code first.
+This is a reproducible report with most of the codes doing the heavy lifting hidden in the background. Someone wondered why I don't show my code on my report. The reason is simple: the code chunks are often VERY long and the information you need as a reviewer is in the report, not the code. As always, it is still available for completeness and reproducibility. You can download the source code of the report by [clicking here](https://github.com/fengkehh/ISYE6501WK4/blob/master/HW4_Report.Rmd).  
 
 # Question 1
 **Using the same crime data set as in Homework 3 Question 4, apply Principal Component Analysis and then create a regression model using the first 4 principal components. Specify your new model in terms of the original variables (not the principal components), and compare its quality to that of your solution to Homework 3 Question 4. You can use the R function prcomp for PCA. (Note that to first scale the data, you can include scale. = TRUE to scale as part of the PCA function.)**
@@ -69,12 +70,6 @@ data.test.pcomps <- predict_pcomps(pca_comps, data.test)
 pred <- predict(model, data.test.pcomps)
 
 q1_mse <- ModelMetrics::mse(data.test$Crime, pred)
-
-data.new <- data.frame(M = 14, So = factor(0, levels = c(0, 1)), Ed = 10, Po1 = 12, Po2 = 15.5, LF = 0.64, M.F = 94, Pop = 150, NW = 1.1, U1 = 0.12, U2 = 3.6, Wealth = 3200, Ineq = 20.1, Prob = 0.04, Time = 39.0)
-
-data.new.pcomps <- predict_pcomps(pca_comps, data.new)
-
-newpred <- predict(model, data.new.pcomps)
 ```
 
 The data set is split into a test (~10%) and training (~90%) with the same random seed used in my HW3 report. Principle components are computed for all of the predictors **except** `So` because it is categorical.
@@ -130,7 +125,9 @@ equation_str <- paste('Crime = ', model$coefficients[1], paste(c(mapply(FUN = eq
 
 Writing out the model using the original predictors, we have:
 
-$`r equation_str`$
+```{r}
+equation_str
+```
 
 Table \@ref(tab:eq-pca) shows the results computed from the above equation (using regular predictors) and the predictions using predict() on the PCA transformed test set side by side. The equation is indeed correct.
 
@@ -165,7 +162,7 @@ kable(df, caption = 'Prediction values using direct equation vs prediction value
 
 ## Model Performance
 
-The model using the first four principle components achieved a MSE of $`r q1_mse`$ on the test set. The model I built in HW3 using the same training set was able to achieve a MSE of 1.3309e4 on the same test set. **The PC model has worse performance.** It should be noted however that my HW3 model was built with extensive feature selection along with data transformation assisted by exploratory data analysis. It is also possible that my HW3 model was overfitted (especially since the sample was so small and there was a bit of test set contamination due to transformation being carried out prior to training/test split.)
+The model using the first four principle components achieved a MSE of $`r q1_mse`$ on the test set. The model I built in HW3 using the same training set was able to achieve a MSE of 1.3309e4 on the same test set. **The PC model has worse performance.** It should be noted however that my HW3 model was built with extensive feature selection along with data transformation assisted by exploratory data analysis. It is also possible that my HW3 model was overfitted (especially since the sample was so small and there was a bit of test set contamination due to transformation being carried out prior to training/test split - a mistake that won't be repeated here.)
 
 \pagebreak
 
@@ -264,3 +261,143 @@ kable(rmse_table, caption = 'RMSE of the 4 different models trained for the uscr
 \pagebreak
 
 # Question 3
+**Describe a situation or problem from your job, everyday life, current events, etc., for which a logistic regression model would be appropriate. List some (up to 5) predictors that you might use.**
+
+With the ISYE6501 mid-term approaching, many people are no doubt wondering if they will pass the test or not. A logistic regression model can be constructed to predict the outcome. The response is the success/fail of a student on his midterm test. Some of the predictors (assuming they can be systematically quantified) can be:
+
+`Grades on Homework Assignments`
+
+`Level of Participation in Office Hours`
+
+`Grades on the Sample Quiz (before reading through the answers)`
+
+`Time Spent on Preparation`
+
+# Question 4
+## Part 1
+**Using the GermanCredit data set at http://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german / (description at http://archive.ics.uci.edu/ml/datasets/Statlog+%28German+Credit+Data%29 ), use logistic regression to find a good predictive model for whether credit applicants are good credit risks or not. Show your model (factors used and their coefficients), the software output, and the quality of fit. You can use the glm function in R. To get a logistic regression (logit) model on data where the response is either zero or one, use family=binomial(link=”logit”) in your glm function call.**
+
+```{r}
+q4_data <- read.table('germancredit.txt')
+
+q4_data$V21[q4_data$V21 == 2] = 0
+    
+q4_data$V21 <- factor(q4_data$V21, labels = c('Bad', 'Good'))
+
+n <- nrow(q4_data)
+
+inTrain <- sample(1:n, size = ceiling(n*0.8))
+
+q4_data.train <- q4_data[inTrain,]
+q4_data.test <- q4_data[-inTrain,]
+
+# hack
+q4_data.test <- rbind(q4_data.train[1,], q4_data.test)
+q4_data.test <- q4_data.test[-1,]
+```
+
+The data is loaded and column 21 is identified as the categorical response. A bit of data manipulation is done to redefine "Bad" as 0 and "Good" as 1. The response is then converted to a factor.
+
+```{r, results = 'hide'}
+model <- glm(V21 ~., data = q4_data.train, family = binomial(link = 'logit'))
+final_model <- stepAIC(model)
+```
+
+As usual the data is then split into a training (80%) and test (20%) set. A logistic regression model using all predictors is first constructed to allow backwards stepwise feature selection using `stepAIC()` from the `MASS` library. The final model statistics is shown below:
+
+```{r}
+summary(final_model)
+```
+
+It should be noted that some of the selected features display bad P-values. However they are all dummy variables created from the factors they belong to and as a whole one or more other levels in that particular factor are always found to be statistically significant. The final model can be written as:
+
+```{r}
+print_eq <- function(model) {
+    pred_terms <- attributes(model$coefficients)$names
+    coefficients <- model$coefficients
+    
+    equation <- paste('P = ', coefficients[1], ' + ', paste(mapply(paste, coefficients[2:length(pred_terms)], pred_terms[2:length(pred_terms)], sep = '*'), collapse = ' + '), sep = '')
+    
+    return(equation)
+}
+
+print_eq(final_model)
+```
+
+Notice that the model computes the *probability* of the response being positive (ie: credit should be classfied as "Good"), rather than the actual response labels themselves. 
+
+### Performance Evaluation
+Predictions are made using the logistic regression model on the test set. To convert predicted probabilities to the proper response labels, a sample cutoff is set at 0.5 (ie: P > 0.5 -> classify as "Good"). The resulting confusion matrix statistics are shown below:
+
+```{r}
+predict_q4 <- function(model, data, threshold = 0.5) {
+    prob <- predict(model, data, type = 'response')
+    pred <- factor(ifelse(prob > threshold, 'Good', 'Bad'))
+    
+    ans <- list(pred = pred, p = prob)
+    return(ans)
+}
+
+
+
+pred.test <- predict_q4(final_model, q4_data.test, threshold = 0.5)
+
+CM <- confusionMatrix(pred.test$pred, q4_data.test$V21, positive = 'Good')
+
+CM
+```
+
+## Part 2
+**Because the model gives a result between 0 and 1, it requires setting a threshold probability to separate between “good” and “bad” answers. In this data set, they estimate that incorrectly identifying a bad customer as good, is 5 times worse than incorrectly classifying a good customer as bad. Determine a good threshold probability based on your model.**
+
+```{r}
+cost_func <- function(CM, FP_cost = 5, FN_cost = 1) {
+    cost <- CM$table[2,1]*FP_cost + CM$table[1,2]*FN_cost
+}
+
+wrapper <- function(model, data, threshold){
+    pred <- predict_q4(model, data, threshold)
+    CM <- caret::confusionMatrix(pred$pred, data$V21, positive = 'Good')
+    cost <- cost_func(CM, 5, 1)
+    return(cost)
+}
+
+grid_search <- function(model, data, range = c(0, 1), grid_n = 1001, level = 1) {
+    thresholds <- seq(from = range[1], to = range[2], length.out = grid_n)
+    n <- length(thresholds)
+    
+    cl <- makePSOCKcluster(4)
+    clusterExport(cl = cl, varlist = list('predict_q4', 'cost_func'))
+
+    costs <- parSapply(cl = cl, X = thresholds, FUN = wrapper, model = model, data = data)
+
+    stopCluster(cl)
+    
+    min_ind <- which.min(costs)
+    
+    if (level < 2) {
+        if (min_ind == 1) {
+            select <- c(1, 3)
+        } else if (min_ind == n) {
+            select <- c(n - 2, n)
+        } else {
+            select <- c(min_ind - 1, min_ind + 1)
+        }
+        plot(thresholds, costs, pch ='.', xlab = 'Probability Threshold', ylab = 'Overall Cost')
+        
+        return(grid_search(model, data, range = thresholds[select], grid_n, level = 2))
+        
+    } else {
+        ans <- list(threshold = thresholds[min_ind], cost = costs[min_ind])
+        return(ans)
+    }
+}
+```
+
+A 2-nested grid search is carried out with 1000 intervals on each level to find the optimal threshold probability level that minimizes the cost on the test set. Figure \@ref(fig:cost-optimized) shows the cost as a function of threshold.
+
+```{r cost-optimized, fig.cap = 'Cost vs Probability Threshold'}
+optimized <- grid_search(final_model, q4_data.test)
+```
+
+The probability threshold P = `r optimized$threshold` results in the minimum cost `r optimized$cost`.
