@@ -125,11 +125,9 @@ equation_str <- paste('Crime = ', model$coefficients[1], paste(c(mapply(FUN = eq
 
 Writing out the model using the original predictors, we have:
 
-```{r}
-equation_str
-```
+$`r equation_str`$
 
-Table \@ref(tab:eq-pca) shows the results computed from the above equation (using regular predictors) and the predictions using predict() on the PCA transformed test set side by side. The equation is indeed correct.
+Table \@ref(tab:eq-pca) shows the results computed from the above equation using regular predictors directly from the test set and the predictions using `predict()` on the PCA model with the predictors in the test set transformed accordingly. The equation is indeed correct.
 
 \FloatBarrier
 
@@ -321,8 +319,10 @@ print_eq <- function(model) {
     return(equation)
 }
 
-print_eq(final_model)
+q4_eq <- print_eq(final_model)
 ```
+
+$`r q4_eq`$
 
 Notice that the model computes the *probability* of the response being positive (ie: credit should be classfied as "Good"), rather than the actual response labels themselves. 
 
