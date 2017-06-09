@@ -72,7 +72,7 @@ pred <- predict(model, data.test.pcomps)
 q1_mse <- ModelMetrics::mse(data.test$Crime, pred)
 ```
 
-The data set is split into a test (~10%) and training (~90%) with the same random seed used in my HW3 report. Principle components are computed for all of the predictors **except** `So` because it is categorical.
+The data set is split into a test (~10%) and training (~90%) with the same random seed used in my [HW3 report](https://github.com/fengkehh/ISYE6501WK3/blob/master/HW3_Report.pdf). Principle components are computed for all of the predictors **except** `So` because it is categorical.
 
 Figure \@ref(fig:varexp) shows the cumulative amount of variance explained by the first four principle components. Without `So` they already explain over 99% of the variance.
 
