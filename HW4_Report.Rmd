@@ -1,7 +1,7 @@
 ---
 title: "ISYE6501 HW4"
 author: "Keh-Harng Feng"
-date: "June 6, 2017"
+date: "June 8, 2017"
 header-includes:
     - \usepackage{placeins}
 output: 
